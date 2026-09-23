@@ -5,8 +5,6 @@ import torch
 from torch.profiler import ProfilerActivity, profile
 
 from methods import CapNet
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Measure CapNet FLOPs and parameters")
     parser.add_argument("--height", type=int, default=384)

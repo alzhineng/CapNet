@@ -1,0 +1,6 @@
+pysodmetrics==1.4.2
+timm==0.9.12
+tqdm==4.66.1
+tensorboard
+pywavelets
+hydra-core==1.3.2

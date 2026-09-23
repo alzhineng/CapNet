@@ -1,0 +1,43 @@
+
+cod10k_tr:
+  {
+    root: "../data/train/COD-TrainDataset",
+    image: { path: "Imgs", suffix: ".jpg" },
+    mask: { path: "GT", suffix: ".png" },
+    add: { path: ["depth",], suffix: [".png" ]},
+#    add: { path: [], suffix: []},
+  }
+camo_tr:
+  {
+    root: "../data/TrainDataset/CAMO_tr",
+    image: { path: "Imgs", suffix: ".jpg" },
+    mask: { path: "GT", suffix: ".png" },
+    add: { path: ["depth",], suffix: [".png" ]},
+  }
+cod10k_te:
+  {
+    root: "../data/TestDataset/COD10K",
+    image: { path: "Imgs", suffix: ".jpg" },
+    mask: { path: "GT", suffix: ".png" },
+    add: { path: ["depth",], suffix: [".png" ]},
+  }
+camo_te:
+  {
+    root: "../data/TestDataset/CAMO",
+    image: { path: "Imgs", suffix: ".jpg" },
+    mask: { path: "GT", suffix: ".png" },
+     add: { path: ["depth",], suffix: [".png" ]},
+  }
+chameleon:
+  {
+    root: "../data/TestDataset/CHAMELEON",
+    image: { path: "Imgs", suffix: ".jpg" },
+    mask: { path: "GT", suffix: ".png" },
+  }
+nc4k:
+  {
+    root: "../data/TestDataset/NC4K",
+    image: { path: "Imgs", suffix: ".jpg" },
+    mask: { path: "GT", suffix: ".png" },
+    add: { path: ["depth",], suffix: [".png" ]},
+  }

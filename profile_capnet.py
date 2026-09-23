@@ -1,10 +1,3 @@
-"""Profile CapNet parameters and FLOPs with PyTorch's built-in profiler.
-
-The default input matches ``configs/capnet_train.py``: one RGB image and one
-depth image (replicated to three channels), each at 384 x 384. PyTorch counts
-one multiply-add as two floating-point operations.
-"""
-
 import argparse
 from collections import defaultdict
 

@@ -16,7 +16,6 @@ import yaml
 from mmengine import Config
 from torch.utils import data
 from tqdm import tqdm
-
 import methods as model_zoo
 from utils import io, ops, pipeline, pt_utils, py_utils, recorder
 import torchvision.transforms as transforms
@@ -31,7 +30,6 @@ import torch.nn.functional as F
 from utils.dataloader import My_test_dataset
 from pathlib import Path
 from torch.multiprocessing import Value
-
 
 def smooth_activation_2d_2(x, lower=0.5, upper=0.75):
     result = np.zeros_like(x)
@@ -65,94 +63,52 @@ def smooth_activation_2d_all(x, k=10, mode='sigmoid',lower=5,upper=95):
     elif mode == 'cubic':
         t = (x[mask1] - lower) / (upper - lower)  # Normalize to [0,1]
         result[mask1] = 3 * t ** 2 - 2 * t ** 3  # Cubic smooth transition
-
     result[mask2] = 1
     return result
 def smooth_activation_2d_sig(x, lower=0.5, upper=0.75, k=10):
     result = np.zeros_like(x)
-
     mid = (lower + upper) / 2
     scale = 12 / (upper - lower)  # Scale factor for sigmoid transition
-
     mask1 = (x > lower) & (x < upper)
     mask2 = x >= upper
-
     result[mask1] = 1 / (1 + np.exp(-scale * (x[mask1] - mid)))  # Sigmoid transition
     result[mask2] = 1
-
     return result
-
 def smooth_activation_2d(x, lower=0.5, upper=0.75):
     result = np.zeros_like(x)
     mask1 = (x > lower) & (x < upper)
     mask2 = x >= upper
-
     t = (x[mask1] - lower) / (upper - lower)# Normalize to [0,1]
     t = t+lower
     result[mask1] = 3 * t ** 2 - 2 * t ** 3  # Smooth transition function
     result[mask2] = 1
-
     return result
 def split_image(image_tensor, num_splits):
-    """
-    将输入的图像张量切割为 num_splits × num_splits 等份，并按通道合并为一个新的图像张量。
-    如果图像尺寸不能被 num_splits 整除，将使用双线性插值填充图像至可整除的大小。
-
-    参数:
-        image_tensor (numpy.ndarray or torch.Tensor): 输入的图像张量，形状为 (channels, height, width) 或 (height, width, channels)。
-        num_splits (int): 横向和纵向切割的份数。
-
-    返回:
-        numpy.ndarray: 按通道合并后的新图像张量，形状为 (channels × num_splits², height / num_splits, width / num_splits)。
-    """
-    # 如果是 PyTorch 张量，先转换为 NumPy 数组
     if 'torch' in str(type(image_tensor)):
         image_tensor = image_tensor.numpy()
-
-    # 确保图像是 NumPy 数组
     assert isinstance(image_tensor, np.ndarray), "Input must be a NumPy array or a PyTorch tensor."
 
-    # 检查图像维度
-    if image_tensor.ndim == 3 and image_tensor.shape[0] in [1, 3]:  # (channels, height, width)
-        image_tensor = np.transpose(image_tensor, (1, 2, 0))  # 转换为 (height, width, channels)
-    elif image_tensor.ndim != 3 or image_tensor.shape[2] not in [1, 3]:  # (height, width, channels)
+    if image_tensor.ndim == 3 and image_tensor.shape[0] in [1, 3]:
+        image_tensor = np.transpose(image_tensor, (1, 2, 0)) 
+    elif image_tensor.ndim != 3 or image_tensor.shape[2] not in [1, 3]: 
         raise ValueError("Input tensor must have shape (channels, height, width) or (height, width, channels).")
-
-    # 获取图像尺寸
     height, width, channels = image_tensor.shape
-
-    # 计算填充的高度和宽度
-    pad_h = (num_splits - (height % num_splits)) % num_splits  # 高度需要填充的部分
-    pad_w = (num_splits - (width % num_splits)) % num_splits  # 宽度需要填充的部分
-
-    # 如果需要填充，则使用双线性插值
+    pad_h = (num_splits - (height % num_splits)) % num_splits 
+    pad_w = (num_splits - (width % num_splits)) % num_splits  
     if pad_h > 0 or pad_w > 0:
-        # 使用 OpenCV 的 resize 来进行双线性插值填充
         new_height = height + pad_h
         new_width = width + pad_w
-
-        # 使用双线性插值将图像大小调整为新尺寸
         padded_image = cv2.resize(image_tensor, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
     else:
         padded_image = image_tensor
-
-    # 获取填充后的图像尺寸
     padded_height, padded_width, _ = padded_image.shape
-
-    # 计算每块的高度和宽度
     h_step = padded_height // num_splits
     w_step = padded_width // num_splits
-
-    # 存放切割结果的列表
     sliced_images = []
-
-    # 遍历行和列，进行切割
     for i in range(num_splits):
         for j in range(num_splits):
             sliced_image = padded_image[i * h_step:(i + 1) * h_step, j * w_step:(j + 1) * w_step, :]
             sliced_images.append(sliced_image)
-
-    # 将切割后的图像按通道合并
     combined_image = np.concatenate([img for img in sliced_images], axis=2)
 
     return combined_image
@@ -201,18 +157,10 @@ class ImageTestDataset(data.Dataset):
     def __getitem__(self, index):
         base_h = self.shape["h"]
         base_w = self.shape["w"]
-
-
         image_path, mask_path = self.total_data_paths[index]
         image = io.read_color_array(image_path)
         shape = image.shape[0],image.shape[1]
-        # shape = ((image.shape[0]+image.shape[1])//4//64)*64+64
-        # base_h=shape
-        # base_w=shape
-
-
         images = ops.ms_resize(image, scales=self.scales, base_h=base_h, base_w=base_w)
-
         imgs=[]
         for i,img in enumerate (images):
             imgi=torch.from_numpy(img).div(255).permute(2, 0, 1)
@@ -223,9 +171,6 @@ class ImageTestDataset(data.Dataset):
             img = split_image(img,self.num_split)
             imgi = torch.from_numpy(img).div(255).permute(2, 0, 1)
             imgs_split.append(imgi)
-
-
-
         imgs_add = []
         for i, data in enumerate (self.total_data_add):
             image_path = data[index]
@@ -251,11 +196,8 @@ class ImageTestDataset(data.Dataset):
             data={"imgs": imgs, "imgs_split": imgs_split, "train": False, "shape": shape, "category": "object"},
             info=dict(mask_path=mask_path, group_name="image"),
         )
-
     def __len__(self):
         return len(self.total_data_paths)
-
-
 class ImageTrainDataset(data.Dataset):
     inter_num = Value('i',0)
     total_num = Value('i',242400)
@@ -270,10 +212,7 @@ class ImageTrainDataset(data.Dataset):
         self.scales_split = cfg.train.scales_split
         self.total_data_paths = []
         self.total_data_add = []
-
         for dataset_name, dataset_info in dataset_infos.items():
-
-
             image_path = os.path.join(dataset_info["root"], dataset_info["image"]["path"])
             image_suffix = dataset_info["image"]["suffix"]
             mask_path = os.path.join(dataset_info["root"], dataset_info["mask"]["path"])
@@ -297,8 +236,6 @@ class ImageTrainDataset(data.Dataset):
                     data_paths = [(os.path.join(image_path, n) + image_suffix) for n in valid_names]
                     LOGGER.info(f"Length of {dataset_name} {dataNate}: {len(data_paths)}")
                     self.total_data_add.append(data_paths)
-
-
         self.trains = A.Compose(
             [
                 A.HorizontalFlip(p=0.5),
@@ -315,25 +252,6 @@ class ImageTrainDataset(data.Dataset):
         image_path, mask_path = self.total_data_paths[index]
         image = io.read_color_array(image_path)
         depth_pth = mask_path.replace("GT", "Edge")
-
-        # if ((ImageTrainDataset.inter_num.value % 128) ==0):
-        #
-        #     base_h=base_h//2+(((base_h//2) *(ImageTrainDataset.inter_num.value/(ImageTrainDataset.total_num.value/2)  ))//32)*32+32
-        #     base_w=base_h
-        #     ImageTrainDataset.base_h=base_h
-        #     ImageTrainDataset.base_w=base_w
-        #     if (ImageTrainDataset.inter_num.value > (ImageTrainDataset.total_num.value / 2)):
-        #
-        #         ImageTrainDataset.base_h = self.shape["h"]
-        #         ImageTrainDataset.base_w = self.shape["w"]
-        #         base_h = ImageTrainDataset.base_h
-        #         base_w = ImageTrainDataset.base_w
-        #     print(base_w)
-        # else:
-        #     base_h=ImageTrainDataset.base_h
-        #     base_w=ImageTrainDataset.base_w
-        # ImageTrainDataset.inter_num.value += 1
-
         # test_path = mask_path.replace("/data/TrainDataset", "/test").replace("/GT", "")
         mask = io.read_gray_array(mask_path, thr=0)
         if os.path.exists(depth_pth):
@@ -349,9 +267,7 @@ class ImageTrainDataset(data.Dataset):
         image = transformed["image"]
         mask = transformed["mask"]
         depth = transformed["depth"]
-
         images = ops.ms_resize(image, scales=self.scales, base_h=base_h, base_w=base_w)
-
         imgs=[]
 
         for i,img in enumerate (images):
@@ -526,43 +442,12 @@ def train(model, cfg):
         model.encoder.requires_grad_(False)
 
     train_start_time = time.perf_counter()
-
-
-    #
-    # for epoch in range(counter.num_epochs):
-    #     LOGGER.info(f"Exp_Name: {cfg.exp_name}")
-    #     epoch_iter_start_time = time.perf_counter()
-    #     model.train()
-    #     if cfg.train.bn.freeze_status:
-    #         pt_utils.frozen_bn_stats(model.encoder, freeze_affine=cfg.train.bn.freeze_affine)
-    #
-    #     # an epoch starts
-    #     # adjust_lr(optimizer,cfg.train.lr,epoch,counter.num_epochs)
-    #     for batch_idx, batch in enumerate(tr_loader):
-    #         print()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     for epoch in range(counter.num_epochs):
         LOGGER.info(f"Exp_Name: {cfg.exp_name}")
         epoch_iter_start_time = time.perf_counter()
         model.train()
         if cfg.train.bn.freeze_status:
             pt_utils.frozen_bn_stats(model.encoder, freeze_affine=cfg.train.bn.freeze_affine)
-
-        # an epoch starts
-        # adjust_lr(optimizer,cfg.train.lr,epoch,counter.num_epochs)
         for batch_idx, batch in enumerate(tr_loader):
             iter_start_time = time.perf_counter()
             scheduler.step(curr_idx=counter.curr_iter)  # update learning rate
@@ -600,15 +485,6 @@ def train(model, cfg):
                 loss_info = f"{loss_str} (M:{loss_recorder.global_avg:.5f}/C:{item_loss:.5f})"
                 lr_info = f"LR: {optimizer.lr_string()}"
                 LOGGER.info(f"{eta_string}({gpu_mem}) | {progress} | {lr_info} | {loss_info} | {data_shape}")
-                # cfg.tb_logger.write_to_tb("lr", optimizer.lr_groups(), counter.curr_iter)
-                # cfg.tb_logger.write_to_tb("iter_loss", item_loss, counter.curr_iter)
-                # cfg.tb_logger.write_to_tb("avg_loss", loss_recorder.global_avg, counter.curr_iter)
-
-            # if counter.curr_iter < 3:  # plot some batches of the training phase
-            #     recorder.plot_results(
-            #         dict(img=data_batch["image_m"], msk=data_batch["mask"], **outputs["vis"]),
-            #         save_path=os.path.join(cfg.path.pth_log, "img", f"iter_{counter.curr_iter}.png"),
-            #     )
 
             iter_time_recorder.update(value=time.perf_counter() - iter_start_time)
             if counter.is_last_total_iter():
@@ -618,14 +494,7 @@ def train(model, cfg):
 
 
         if epoch>=(counter.num_epochs-10):
-        # if epoch>=1:
-            # io.save_weight(model=model, save_path=cfg.path.final_state_net)
             test(model=model, cfg=cfg,epoch=epoch)
-            # an epoch ends
-        # recorder.plot_results(
-        #     dict(img=data_batch["image_m"], msk=data_batch["mask"], **outputs["vis"]),
-        #     save_path=os.path.join(cfg.path.pth_log, "img", f"epoch_{counter.curr_epoch}.png"),
-        # )
         counter.update_epoch_counter()
         epoch_eta_seconds = (time.perf_counter()- epoch_iter_start_time) *(counter.num_epochs - epoch - 1)
         epoch_eta_string = f"epoch_ETA: {datetime.timedelta(seconds=int(epoch_eta_seconds))}"
@@ -639,8 +508,6 @@ def train(model, cfg):
     LOGGER.info(
         f"Total Training Time: {datetime.timedelta(seconds=int(total_train_time))} ({total_other_time} on others)"
     )
-
-# 获取当前脚本的路径 current_path =   # 获取父目录的名称 parent_dir_name = current_path.parent.name
 def parse_cfg():
     parser = argparse.ArgumentParser("Training and evaluation script")
     parser.add_argument("--config", default='./configs/capnet_train.py', type=str)
@@ -705,10 +572,7 @@ def main():
 
     if cfg.load_from:
         io.load_weight(model=model, load_path=cfg.load_from, strict=True)
-
     LOGGER.info(f"Number of Parameters: {sum((v.numel() for v in model.parameters(recurse=True) if v.requires_grad))}")
-    # io.load_weight(model=model, load_path='/home/fy/pythonProject/multimodal10_outputs/PvtV2B2_ZoomNeXt_BS4_LR0.0001_E40_H384_W384_OPMadam_OPGMfinetune_SCstep_AMP/exp_22/pth/state_final.pth', strict=True)
-    # test(model=model, cfg=cfg, epoch=1)
     if not cfg.evaluate:
         train(model=model, cfg=cfg)
     # LOGGER.info("End training...")

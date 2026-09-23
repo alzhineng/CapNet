@@ -1,4 +1,4 @@
-"""Experiment 2: frozen SAM2 + rank-4 LoRA."""
+
 
 from .lpa_ablation_common import LPAComponentAblation
 
